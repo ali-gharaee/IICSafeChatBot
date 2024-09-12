@@ -19,11 +19,11 @@ class MessageHandlerBot:
         message_text = update.message.text
 
         # Check for extremism using the openai_integration
-        is_extremist, response = self.openai_integration.check_for_extremism(message_text)
+        is_extremist = self.openai_integration.check_for_extremism(message_text)
 
         if is_extremist:
             # Handle warnings and blocking using WarningsManager
             await self.warnings_manager.process_warning(user, update, context)
         else:
             logging.info(f"Message from {user.username}: {message_text}")
-            logging.info(f"OpenAI Response: {response}")
+            # logging.info(f"OpenAI Response: {response}")
