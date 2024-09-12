@@ -1,39 +1,116 @@
+import logging
+from datetime import timedelta
+
 class WarningsManager:
     def __init__(self, config):
         self.config = config
-        self.warnings = {}  # Track warnings per user
+        self.warning_limit = int(self.config['warning_limit'])
+        self.second_warning_limit = int(self.config['second_warning_limit'])
+        self.block_duration = int(self.config['block_duration'])
+        self.admin_chat_ids = [int(admin_id.strip()) for admin_id in self.config['admin_chat_ids'].split(',')]
+        self.notify_recipients = self.config['notify_recipients'].split(',')  # Split the recipients string
+        self.remove_message = self.config.get('remove_message', 'true').lower() == 'true'
+        self.user_warnings = {}
+        self.user_blocked = {}
 
     async def process_warning(self, user, update, context):
         user_id = user.id
-        if user_id not in self.warnings:
-            self.warnings[user_id] = 0
+        username = user.username or user.first_name or f"User {user_id}"
 
-        self.warnings[user_id] += 1
-        username = user.username
+        # Notify the owner/admins with the user's message
+        await self.notify_recipients_of_hate_message(user, update, context)
 
-        # Decide which warning message to send based on the number of warnings
-        if self.warnings[user_id] == 1:
-            warning_message = self.config['first_warning_message'].format(username=username)
-        elif self.warnings[user_id] == 2:
-            warning_message = self.config['second_warning_message'].format(username=username)
-        elif self.warnings[user_id] >= int(self.config['warning_limit']):
-            warning_message = self.config['final_warning_message'].format(username=username, block_duration=self.config['block_duration'])
-            await self.block_user(user, update, context)
+        # Optionally remove the hate message from the group
+        if self.remove_message:
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+            logging.info(f"Message from {username} removed from the group.")
 
-        # Send the warning message
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=warning_message)
+        # Check if the user has been blocked before
+        if user_id in self.user_blocked:
+            warnings_after_block = self.user_warnings[user_id]
+            if warnings_after_block >= self.second_warning_limit:
+                # Kick the user from the group
+                await context.bot.kick_chat_member(update.effective_chat.id, user_id)
+                logging.info(f"{username} has been kicked out for exceeding the second warning limit.")
+                return
+            else:
+                self.user_warnings[user_id] += 1
+                await self.send_warning(user, update, context, warnings_after_block)
+        else:
+            # Process warnings and block
+            if user_id not in self.user_warnings:
+                self.user_warnings[user_id] = 0
 
-    async def block_user(self, user, update, context):
-        block_duration = int(self.config['block_duration'])
-        username = user.username
+            self.user_warnings[user_id] += 1
 
-        # Block the user and notify the group
-        block_message = self.config['block_message'].format(username=username, block_duration=block_duration)
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=block_message)
+            if self.user_warnings[user_id] >= self.warning_limit:
+                # Block the user
+                block_until = timedelta(hours=self.block_duration)
+                await context.bot.ban_chat_member(update.effective_chat.id, user_id, until_date=block_until)
+                self.user_blocked[user_id] = True
+                self.user_warnings[user_id] = 0  # Reset warnings after blocking
+                logging.info(f"{username} has been blocked for {self.block_duration} hours.")
+            else:
+                # Send a warning message
+                await self.send_warning(user, update, context, self.user_warnings[user_id])
 
-        # Notify the admin if needed
-        admin_chat_id = int(self.config['admin_chat_id'])
-        await context.bot.send_message(chat_id=admin_chat_id, text=block_message)
+    async def send_warning(self, user, update, context, warning_count):
+        username = user.username or user.first_name or f"User {user.id}"
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"{username}, this is warning {warning_count} for inappropriate content."
+        )
+        logging.info(f"{username} has received warning {warning_count}.")
 
-        # Block the user in the group
-        await context.bot.ban_chat_member(update.effective_chat.id, user.id)
+    async def notify_recipients_of_hate_message(self, user, update, context):
+        username = user.username or user.first_name or f"User {user.id}"
+        message_text = update.message.text
+
+        # Get owner and admins dynamically
+        owner, admin_chat_ids = await self.get_admins_and_owner(update, context)
+
+        # Notify group owner
+        if 'owner' in self.notify_recipients and owner:
+            try:
+                await context.bot.send_message(
+                    chat_id=owner.id,
+                    text=f"User {username} (ID: {user.id}) sent a hate message: '{message_text}'"
+                )
+                logging.info(f"Notified group owner {owner.id} about {username}'s hate message.")
+            except Exception as e:
+                logging.error(f"Failed to notify group owner {owner.id}: {e}")
+        
+        # Notify admins
+        if 'admins' in self.notify_recipients:
+            for admin_id in admin_chat_ids:
+                try:
+                    await context.bot.send_message(
+                        chat_id=admin_id,
+                        text=f"User {username} (ID: {user.id}) sent a hate message: '{message_text}'"
+                    )
+                    logging.info(f"Notified admin {admin_id} about {username}'s hate message.")
+                except Exception as e:
+                    logging.error(f"Failed to notify admin {admin_id}: {e}")
+                    
+    async def get_admins_and_owner(self, update, context):
+        """Fetch the group admins and the owner (creator) dynamically."""
+        chat_id = update.effective_chat.id
+
+        try:
+            # Get the list of administrators for the chat
+            admins = await context.bot.get_chat_administrators(chat_id)
+
+            owner = None
+            admin_chat_ids = []
+
+            for admin in admins:
+                if admin.status == 'creator':  # This is the owner (creator)
+                    owner = admin.user
+                elif admin.status == 'administrator':  # This is a regular admin
+                    admin_chat_ids.append(admin.user.id)
+
+            return owner, admin_chat_ids
+
+        except Exception as e:
+            logging.error(f"Error retrieving admins or owner: {e}")
+            return None, []
