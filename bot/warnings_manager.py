@@ -1,18 +1,18 @@
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 class WarningsManager:
     def __init__(self, config):
         self.config = config
-        self.warning_limit = int(self.config['warning_limit'])
-        self.second_warning_limit = int(self.config['second_warning_limit'])
+        self.warning_limit = int(self.config['warning_limit'])  # First phase warning limit
+        self.second_warning_limit = int(self.config['second_warning_limit'])  # Second phase warning limit
         self.block_duration = int(self.config['block_duration'])
-        self.admin_chat_ids = [int(admin_id.strip()) for admin_id in self.config['admin_chat_ids'].split(',')]
         self.notify_recipients = self.config['notify_recipients'].split(',')  # Split the recipients string
         self.remove_message = self.config.get('remove_message', 'true').lower() == 'true'
-        self.user_warnings = {}
-        self.user_blocked = {}
-
+        self.user_warnings = {}  # Stores warnings for each user
+        self.user_blocked = {}  # Tracks whether the user has been blocked
+    
+    
     async def process_warning(self, user, update, context):
         user_id = user.id
         username = user.username or user.first_name or f"User {user_id}"
@@ -27,34 +27,52 @@ class WarningsManager:
 
         # Check if the user has been blocked before
         if user_id in self.user_blocked:
-            warnings_after_block = self.user_warnings[user_id]
-            if warnings_after_block >= self.second_warning_limit:
-                # Kick the user from the group
-                await context.bot.kick_chat_member(update.effective_chat.id, user_id)
-                logging.info(f"{username} has been kicked out for exceeding the second warning limit.")
-                return
-            else:
-                self.user_warnings[user_id] += 1
-                await self.send_warning(user, update, context, warnings_after_block)
+            if self.user_blocked[user_id]:
+                # The user has already been blocked, so check the second phase warnings
+                warnings_after_block = self.user_warnings.get(user_id, 0)
+                if warnings_after_block >= self.second_warning_limit:
+                    # Kick the user after second-phase warnings are exceeded
+                    await context.bot.kick_chat_member(update.effective_chat.id, user_id)
+                    logging.info(f"{username} has been kicked out for exceeding the second warning limit.")
+                    return
+                else:
+                    # Increment second-phase warnings
+                    self.user_warnings[user_id] += 1
+                    await self.send_warning(user, update, context, self.user_warnings[user_id])
+            return
+
+        # First phase: process warnings and block
+        if user_id not in self.user_warnings:
+            self.user_warnings[user_id] = 0
+
+        # Increment warning count
+        self.user_warnings[user_id] += 1
+
+        # Check if the user has reached the warning limit
+        if self.user_warnings[user_id] >= self.warning_limit:
+            # Calculate the actual unblock time by adding the timedelta to the current time
+            
+            
+            logging.info(self.block_duration)
+            logging.info(timedelta(hours=self.block_duration))
+            
+            block_until = datetime.now() + timedelta(hours=self.block_duration)
+            logging.info(block_until)
+            # permission = context.bot.ChatPermissions = {"can_send_messages"}
+            
+            await context.bot.restrict_chat_member(update.effective_chat.id, user_id, permissions={'can_send_messages': False}, until_date=block_until)
+            self.user_blocked[user_id] = True  # Mark the user as blocked
+            self.user_warnings[user_id] = 0  # Reset warnings for the second phase
+            logging.info(f"{username} has been restricted for 1 day")
+            # logging.info(f"{username} has been banned for {self.block_duration} hours.")
         else:
-            # Process warnings and block
-            if user_id not in self.user_warnings:
-                self.user_warnings[user_id] = 0
+            # Send a warning message
+            await self.send_warning(user, update, context, self.user_warnings[user_id])
 
-            self.user_warnings[user_id] += 1
-
-            if self.user_warnings[user_id] >= self.warning_limit:
-                # Block the user
-                block_until = timedelta(hours=self.block_duration)
-                await context.bot.ban_chat_member(update.effective_chat.id, user_id, until_date=block_until)
-                self.user_blocked[user_id] = True
-                self.user_warnings[user_id] = 0  # Reset warnings after blocking
-                logging.info(f"{username} has been blocked for {self.block_duration} hours.")
-            else:
-                # Send a warning message
-                await self.send_warning(user, update, context, self.user_warnings[user_id])
+    # Rest of your code remains the same
 
     async def send_warning(self, user, update, context, warning_count):
+        """Send a warning message to the user."""
         username = user.username or user.first_name or f"User {user.id}"
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -63,6 +81,7 @@ class WarningsManager:
         logging.info(f"{username} has received warning {warning_count}.")
 
     async def notify_recipients_of_hate_message(self, user, update, context):
+        """Notify the group owner and admins about the hate message."""
         username = user.username or user.first_name or f"User {user.id}"
         message_text = update.message.text
 
@@ -91,7 +110,7 @@ class WarningsManager:
                     logging.info(f"Notified admin {admin_id} about {username}'s hate message.")
                 except Exception as e:
                     logging.error(f"Failed to notify admin {admin_id}: {e}")
-                    
+
     async def get_admins_and_owner(self, update, context):
         """Fetch the group admins and the owner (creator) dynamically."""
         chat_id = update.effective_chat.id
