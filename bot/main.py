@@ -5,8 +5,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from bot.message_handler import MessageHandlerBot
 from bot.utils import load_config
 
-logging.basicConfig(filename='logs/bot.log', level=logging.INFO)
-
 class TelegramBot:
     def __init__(self):
         # Load all configurations
