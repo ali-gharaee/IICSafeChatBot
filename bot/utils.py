@@ -7,9 +7,9 @@ def load_config():
     config = configparser.ConfigParser()
 
     # Load bot configuration
-    bot_config_path = '../config/bot_config.properties'
-    warning_config_path = '../config/warnings_config.properties'
-    logging_config_path = '../config/logging_config.properties'
+    bot_config_path = 'config/bot_config.properties'
+    warning_config_path = 'config/warnings_config.properties'
+    logging_config_path = 'config/logging_config.properties'
     
     # Ensure both files exist
     if not os.path.exists(bot_config_path):
