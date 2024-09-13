@@ -35,14 +35,14 @@ All configurations are stored in the \`config/bot_config.properties\` file. This
 
 \`\`\`ini
 [warning_config]
-warning_limit=3
-second_warning_limit=2
-block_duration=24  # Block duration in hours
-admin_chat_ids=  # Admin IDs to notify
-notify_recipients=owner,admins  # Can be "owner", "admins", or both
-remove_message=true  # Remove inappropriate messages from the group
-use_openai=true  # Use OpenAI API if true; otherwise fallback to local model
-openai_api_key=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXX  # OpenAI API key
+- warning_limit=3
+- second_warning_limit=2
+- block_duration=24  # Block duration in hours
+- admin_chat_ids=  # Admin IDs to notify
+- notify_recipients=owner,admins  # Can be "owner", "admins", or both
+- remove_message=true  # Remove inappropriate messages from the group
+- use_openai=true  # Use OpenAI API if true; otherwise fallback to local model
+- openai_api_key=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXX  # OpenAI API key
 \`\`\`
 
 ## Requirements
@@ -51,7 +51,7 @@ To run this bot, the following requirements need to be installed:
 
 1. **Python** 3.8 or higher
 2. **Required Python libraries**:
-   - \`openai\` (version 1.45.0 or higher)
+   - \`openai\` (version 0.27.0 or higher)
    - \`torch\`
    - \`transformers\`
    - \`python-telegram-bot\`
