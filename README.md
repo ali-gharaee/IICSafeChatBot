@@ -59,9 +59,9 @@ To run this bot, the following requirements need to be installed:
 
 Install the dependencies using the following command:
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ## Test Sentences
 
