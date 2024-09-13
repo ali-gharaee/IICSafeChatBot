@@ -1,6 +1,3 @@
-#!/bin/bash
-
-cat <<EOL > README.md
 # Telegram Hate Speech Detection Bot
 
 This project is a Telegram bot designed to detect and handle hate speech and inappropriate content in group chats. The bot uses **OpenAI's GPT-3.5 Turbo** to classify messages and a fallback model, **Facebook's fine-tuned Roberta hate-speech detection model** (\`facebook/roberta-hate-speech-dynabench-r4-target\`), when the OpenAI API is unavailable.
