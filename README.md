@@ -33,17 +33,17 @@ All configurations are stored in the \`config/bot_config.properties\` file. This
 
 **Example configuration:**
 
-\`\`\`ini
+```ini
 [warning_config]
-- warning_limit=3
-- second_warning_limit=2
-- block_duration=24  # Block duration in hours
-- admin_chat_ids=  # Admin IDs to notify
-- notify_recipients=owner,admins  # Can be "owner", "admins", or both
-- remove_message=true  # Remove inappropriate messages from the group
-- use_openai=true  # Use OpenAI API if true; otherwise fallback to local model
-- openai_api_key=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXX  # OpenAI API key
-\`\`\`
+warning_limit=3
+second_warning_limit=2
+block_duration=24  # Block duration in hours
+admin_chat_ids=  # Admin IDs to notify
+notify_recipients=owner,admins  # Can be "owner", "admins", or both
+remove_message=true  # Remove inappropriate messages from the group
+use_openai=true  # Use OpenAI API if true; otherwise fallback to local model
+openai_api_key=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXX  # OpenAI API key
+```
 
 ## Requirements
 
@@ -107,8 +107,8 @@ pip install -r requirements.txt
 2. Configure the necessary values in \`bot_config.properties\`.
 3. Run the bot:
 
-\`\`\`bash
+```bash
 python -m bot.main
-\`\`\`
+```
 
 Logs will be written to the \`logs/\` directory for audit and analysis purposes.
