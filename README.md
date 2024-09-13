@@ -112,5 +112,3 @@ python -m bot.main
 \`\`\`
 
 Logs will be written to the \`logs/\` directory for audit and analysis purposes.
-
-EOL
